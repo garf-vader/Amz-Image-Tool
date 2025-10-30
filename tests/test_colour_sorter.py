@@ -2,7 +2,8 @@ import os
 from colour_sorter import run_with_map
 
 # Set the input folder to Inputs
-input_root = os.path.join(os.path.dirname(__file__), "Inputs")
+repo_dir = os.path.dirname(os.path.dirname(__file__))
+input_root = os.path.join(repo_dir, "Inputs")
 # pt_map key is relative path from input_root
 col_map = {"Google/Pixel 9a/VintageWallet": ["Brown"]}
 

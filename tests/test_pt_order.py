@@ -5,7 +5,8 @@ from pt_order import run_with_map
 
 
 # Root folder is Inputs
-root_folder = os.path.join(os.path.dirname(__file__), "Inputs")
+repo_dir = os.path.dirname(os.path.dirname(__file__))
+root_folder = os.path.join(repo_dir, "Inputs")
 # Mapping key is relative path from Inputs
 pt_map = {"Google/Pixel 9a/VintageWallet": [0, 5, 4, 2, 3, 1]}
 
