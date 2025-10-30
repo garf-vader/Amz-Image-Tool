@@ -1,15 +1,23 @@
+
 import os
+import sys
 from pathlib import Path
+import shutil
+from datetime import datetime
+
+# Ensure repo root is in sys.path for imports
+repo_dir = os.path.dirname(os.path.dirname(__file__))
+if repo_dir not in sys.path:
+    sys.path.insert(0, repo_dir)
+
 from colour_sorter import run_with_map as colour_run_with_map
 from pt_order import run_with_map as pt_run_with_map
 from amz_rename import process_root
-
-
-
-
 import time
-script_dir = os.path.dirname(__file__)
-input_root = os.path.join(script_dir, "Inputs")
+
+# Use repo root as script_dir
+repo_dir = os.path.dirname(os.path.dirname(__file__))
+input_root = os.path.join(repo_dir, "Inputs")
 col_map = {"Google/Pixel 9a/VintageWallet": ["Brown"]}
 pt_map = {"Google/Pixel 9a/VintageWallet/Brown": [0, 5, 4, 2, 3, 1]}
 
@@ -34,7 +42,8 @@ print(f"pt_order output folder: {pt_output}")
 time.sleep(1)
 
 # Step 3: Create sku2asin.csv for amz_rename
-csv_path = os.path.join(script_dir, "sku2asin.csv")
+
+csv_path = os.path.join(repo_dir, "sku2asin.csv")
 with open(csv_path, "w", encoding="utf-8") as f:
     f.write("sku,asin\n")
     f.write("Google Pixel 9a VintageWallet Brown,B0F3JG39SM\n")
@@ -48,4 +57,22 @@ else:
     amz_output_path = amz_output
 assert amz_output_path.exists() and amz_output_path.is_dir(), f"No output from amz_rename! Got: {amz_output_path}"
 print(f"amz_rename output folder: {amz_output_path}")
+
+ # Cleanup: delete all output folders except amz_rename one, rename amz_rename output
+
+# Find all output folders in repo_dir/Outputs
+outputs_dir = os.path.join(repo_dir, "Outputs")
+if amz_output_path.parent == Path(outputs_dir):
+    # Delete all other folders in Outputs except amz_rename output
+    for item in Path(outputs_dir).iterdir():
+        if item != amz_output_path and item.is_dir():
+            shutil.rmtree(item)
+    # Rename amz_rename output folder
+    date_str = datetime.now().strftime("%Y%m%d")
+    renamed_path = amz_output_path.parent / f"{date_str}_Renamed"
+    amz_output_path.rename(renamed_path)
+    print(f"Renamed amz_rename output folder to: {renamed_path}")
+else:
+    print("amz_rename output folder is not in Outputs directory; cleanup skipped.")
+
 print("Integration test completed.")
