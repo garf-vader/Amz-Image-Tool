@@ -26,12 +26,7 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 INCLUDE_HIDDEN = False
 
 
-def _natural_key(p: Path) -> List[object]:
-    parts = re.split(r"(\d+)", p.name)
-    out: List[object] = []
-    for s in parts:
-        out.append(int(s) if s.isdigit() else s.lower())
-    return out
+from logic_utils import natural_key
 
 
 def _is_hidden(p: Path) -> bool:
@@ -42,7 +37,7 @@ def _is_hidden(p: Path) -> bool:
 
 
 def _iter_images(folder: Path) -> Iterable[Path]:
-    for e in sorted(folder.iterdir(), key=_natural_key):
+    for e in sorted(folder.iterdir(), key=lambda p: natural_key(p.name)):
         if e.is_file() and e.suffix.lower() in IMAGE_EXTS and not _is_hidden(e):
             yield e
 
