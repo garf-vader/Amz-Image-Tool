@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+import os
+import re
+import uuid
+from pathlib import Path
+from typing import Dict, Iterable, List, Tuple, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from logic_utils import natural_key
+from datetime import datetime
+import shutil
+import inspect
+
 """
 pt_order.py — fast + safe PT renamer
 
@@ -20,26 +32,12 @@ Perf notes:
 - Avoids Path object churn inside tight loops.
 """
 
-from __future__ import annotations
-
-import os
-import re
-import uuid
-from pathlib import Path
-from typing import Dict, Iterable, List, Tuple, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 APPLY_CHANGES_DEFAULT = True
 INCLUDE_HIDDEN = False
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff"}
 
 # ---------- fast natural sort ----------
 _DIGIT_RE = re.compile(r"(\d+)")
-
-def _natural_key(name: str):
-    parts = _DIGIT_RE.split(name)
-    # int for digit runs, lowercased str otherwise
-    return tuple(int(p) if p.isdigit() else p.lower() for p in parts)
 
 # ---------- fast image listing ----------
 def _list_images(dirpath: str) -> List[str]:
@@ -54,7 +52,7 @@ def _list_images(dirpath: str) -> List[str]:
             ]
     except FileNotFoundError:
         return []
-    files.sort(key=_natural_key)
+    files.sort(key=natural_key)
     return files
 
 # ---------- leaf discovery ----------
@@ -76,7 +74,7 @@ def _find_leaf_dirs(base: str) -> List[str]:
     if not has_subdir:
         leaves = [base]  # base is already a leaf
     # stable order by natural key on path
-    leaves.sort(key=lambda p: _natural_key(p.replace("\\", "/")))
+    leaves.sort(key=natural_key)
     return leaves
 
 def _width_from_mapping(mapping: List[int]) -> int:
@@ -112,13 +110,10 @@ def _two_phase_rename(pairs: List[Tuple[str, str]], apply: bool, log: bool):
     """Copy renamed files to Outputs/timestamp instead of renaming in place."""
     if not pairs:
         return
-    from datetime import datetime
-    import shutil
-    import os
+
     script_dir = os.path.dirname(__file__)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # Get the root argument from the caller (run_with_map)
-    import inspect
     frame = inspect.currentframe()
     while frame:
         if 'root' in frame.f_locals:
@@ -196,8 +191,6 @@ def run_with_map(
                 results.append((leaf, pairs))
 
     # Perform renames per-leaf (sequential keeps it simple/safe)
-    from datetime import datetime
-    import os
     script_dir = os.path.dirname(__file__)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_root = os.path.join(script_dir, "Outputs", timestamp)
