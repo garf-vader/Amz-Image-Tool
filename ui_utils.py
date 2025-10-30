@@ -22,6 +22,9 @@ IMAGE_EXTS: set[str] = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff
 THUMB_SIZE: tuple[int, int] = (80, 80)
 ROW_PAD_Y: int = 6
 
+# Common target folder names used by the reorder phase
+TARGET_FOLDER_NAMES = ["VintageWallet", "ShinyWallet", "VintWallet", "ShinyCase"]
+
 # Reorder UI visual constants (exposed so UIs don't redefine them)
 INSERT_LINE_PAD: int = 3       # gap before/after row for the insertion line
 INSERT_LINE_HEIGHT: int = 4    # thickness of the insertion line
@@ -94,6 +97,18 @@ def has_images(path: str) -> bool:
     except FileNotFoundError:
         return False
     return False
+
+
+# Minimal get_output_root helper used by UI phases
+def get_output_root(base_dir: str) -> str:
+    try:
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        output_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Outputs", timestamp)
+        os.makedirs(output_root, exist_ok=True)
+        return output_root
+    except Exception:
+        return os.getcwd()
 
 
 def pt_order_path(script_file: Optional[str] = None) -> str:
