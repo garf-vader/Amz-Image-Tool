@@ -460,47 +460,17 @@ class OrderPhase(tk.Frame):
 
 def _sort_front_images(root_dir: str):
     """
-    Ask user for a folder of front images.
-    For each model/producttype/colour.jpg, copy it into model/producttype/colour/MAIN.jpg.
+    Ask user for a folder of front images and copy them using front_image.copy_front_images.
     """
+    from front_image import copy_front_images
     path = filedialog.askdirectory(title="Choose FRONT IMAGES folder")
     if not path:
         print("No FRONT IMAGES folder chosen.")
         return
-
-    copied = 0
-    skipped = 0
-
-    for dirpath, _, files in os.walk(path):
-        for fname in files:
-            name, ext = os.path.splitext(fname)
-            if ext.lower() != ".jpg":
-                continue
-
-            colour = name.strip()
-            rel = os.path.relpath(dirpath, path).replace("\\", "/").strip("/")
-            # rel should now be model/producttype
-            target_dir = os.path.join(root_dir, rel, colour)
-
-            if not os.path.isdir(target_dir):
-                print(f"⚠ Skipped: {target_dir} not found")
-                skipped += 1
-                continue
-
-            src = os.path.join(dirpath, fname)
-            dst = os.path.join(target_dir, "MAIN.jpg")
-
-            try:
-                shutil.copy2(src, dst)
-                print(f"✓ Copied {src} → {dst}")
-                copied += 1
-            except Exception as e:
-                print(f"✗ Failed {src}: {e}")
-                skipped += 1
-
-    print(f"\nDone. Copied: {copied}, Skipped: {skipped}")
+    result = copy_front_images(path, root_dir)
+    print(f"\nDone. Copied: {result['copied']}, Skipped: {result['skipped']}")
     try:
-        messagebox.showinfo("Front Images", f"Copied: {copied}, Skipped: {skipped}")
+        messagebox.showinfo("Front Images", f"Copied: {result['copied']}, Skipped: {result['skipped']}")
     except Exception:
         pass
 
