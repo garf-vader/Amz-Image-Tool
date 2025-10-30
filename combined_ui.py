@@ -26,6 +26,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import List, Optional
 from datetime import datetime
+from pathlib import Path
 
 from ui_utils import (
     IMAGE_EXTS,
@@ -61,10 +62,11 @@ def _call_optional(func_name: str, *args, **kwargs):
 
 
 def get_output_root(base_dir):
-    import os
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    script_dir = os.path.dirname(__file__)
-    output_root = os.path.join(script_dir, "Outputs", timestamp)
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    if repo_dir.endswith('tests'):
+        repo_dir = os.path.dirname(repo_dir)
+    output_root = os.path.join(repo_dir, "Outputs", timestamp)
     os.makedirs(output_root, exist_ok=True)
     return output_root
 
@@ -234,10 +236,11 @@ class ColorPhase(tk.Frame):
             messagebox.showinfo("Batch complete","Recorded colour sequences for all leaf folders.")
             try:
                 import colour_sorter
-                colour_sorter.run_with_map(self.top_dir, self.col_map, apply_changes=True)
+                colour_output = colour_sorter.run_with_map(self.top_dir, self.col_map, apply_changes=True)
             except Exception as e:
                 messagebox.showerror("colour_sorter failed", str(e))
-            if callable(self.on_complete): self.on_complete(self.top_dir)
+                colour_output = self.top_dir
+            if callable(self.on_complete): self.on_complete(colour_output)
             return
         self._load_leaf(nxt); self._update_label()
 
@@ -439,16 +442,14 @@ class OrderPhase(tk.Frame):
             self.status.config(text="All VintageWallet models processed.")
             messagebox.showinfo("Done","All VintageWallet models processed.")
             # Run pt_order with in-memory map, then amz_rename
+            pt_output = self.root_dir
             try:
                 import pt_order
-                pt_order.run_with_map(self.root_dir, self.pt_map, apply_changes=True)
+                pt_output = pt_order.run_with_map(self.root_dir, self.pt_map, apply_changes=True)
             except Exception as e:
                 print("pt_order failed:", e)
-            try:
-                _call_optional("amz_rename", self.root_dir)
-            except Exception as e:
-                print("amz_rename failed:", e)
-            if callable(self.on_complete): self.on_complete()
+            # Only call on_complete with pt_output, do not run amz_rename here
+            if callable(self.on_complete): self.on_complete(pt_output)
             return
         self._load_current(); self._update_progress_label()
 
@@ -494,20 +495,48 @@ class CombinedApp(tk.Tk):
         self.current_phase = ColorPhase(self, on_complete=self._on_colour_done)
         self.current_phase.pack(fill=tk.BOTH, expand=True)
 
-    def _on_colour_done(self, chosen_root):
-        self.root_dir = chosen_root
+    def _on_colour_done(self, colour_output):
+        self.root_dir = colour_output
         self._clear_phase()
         self.current_phase = OrderPhase(self, root_dir=self.root_dir, on_complete=self._on_order_done)
         self.current_phase.pack(fill=tk.BOTH, expand=True)
 
-    def _on_order_done(self):
+    def _on_order_done(self, pt_output=None):
         try:
             if messagebox.askyesno("Front Images", "Do you want to copy front images into their folders?"):
                 _sort_front_images(self.root_dir)
 
-            if messagebox.askyesno("Amazon Rename", "Do you want to run amz_rename now?"):
+            # Only run amz_rename if user confirms
+            amz_output = None
+            if pt_output and messagebox.askyesno("Amazon Rename", "Do you want to run amz_rename now?"):
                 import amz_rename
-                amz_rename.process_root(self.root_dir)
+                abs_pt_output = os.path.abspath(pt_output)
+                amz_output = amz_rename.process_root(abs_pt_output)
+            # Only run cleanup if amz_output is provided
+            if amz_output:
+                import shutil
+                from datetime import datetime
+                from pathlib import Path
+                repo_dir = os.path.dirname(os.path.abspath(__file__))
+                if repo_dir.endswith('tests'):
+                    repo_dir = os.path.dirname(repo_dir)
+                outputs_dir = os.path.join(repo_dir, "Outputs")
+                if isinstance(amz_output, str):
+                    amz_output_path = Path(amz_output)
+                else:
+                    amz_output_path = amz_output
+                if amz_output_path.parent == Path(outputs_dir):
+                    # Delete all other folders in Outputs except amz_rename output
+                    for item in Path(outputs_dir).iterdir():
+                        if item != amz_output_path and item.is_dir():
+                            shutil.rmtree(item)
+                    # Rename amz_rename output folder
+                    date_str = datetime.now().strftime("%Y%m%d")
+                    renamed_path = amz_output_path.parent / f"{date_str}_Renamed"
+                    amz_output_path.rename(renamed_path)
+                    messagebox.showinfo("Cleanup", f"Renamed amz_rename output folder to: {renamed_path}")
+                else:
+                    messagebox.showinfo("Cleanup", "amz_rename output folder is not in Outputs directory; cleanup skipped.")
 
         finally:
             try:
