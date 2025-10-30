@@ -209,3 +209,4 @@ __marimo__/
 # Ignore input images and output images
 /Inputs/
 /Outputs/
+sku2asin.csv
