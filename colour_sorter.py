@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, List, Iterable
 import re
 import shutil
+from datetime import datetime
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 INCLUDE_HIDDEN = False
@@ -81,6 +82,12 @@ def _move_round_robin(files: List[Path], colour_dirs: Dict[str, Path], order: Li
 
 
 def _process(root: Path, col_map: Dict[str, List[str]], apply: bool) -> int:
+    # Create timestamped output folder
+    import os
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    script_dir = Path(os.path.dirname(__file__))
+    output_root = script_dir / "Outputs" / timestamp
+    output_root.mkdir(parents=True, exist_ok=True)
     acted = 0
     for rel, seq in col_map.items():
         rel_posix = str(rel).strip().strip("/")
@@ -98,11 +105,27 @@ def _process(root: Path, col_map: Dict[str, List[str]], apply: bool) -> int:
         if not files:
             continue
 
-        dirs = _ensure_colour_dirs(folder, colours)
-        _move_round_robin(files, dirs, colours, apply)
-        vintage = False
-        if vintage:
-            _copy_final_to_all_colours(files, dirs, colours, apply)
+        # Create output dirs for colours
+        out_dirs = {}
+        for c in colours:
+            name = c.strip()
+            if not name:
+                continue
+            d = output_root / rel_posix / name
+            d.mkdir(parents=True, exist_ok=True)
+            out_dirs[name] = d
+
+        # Copy files round-robin to output dirs
+        k = len(colours)
+        for i, src in enumerate(files):
+            colour = colours[i % k].strip()
+            if not colour:
+                continue
+            dst_dir = out_dirs.get(colour)
+            if not dst_dir:
+                continue
+            dst = dst_dir / src.name
+            shutil.copy2(src, dst)
         acted += 1
     return acted
 
@@ -116,7 +139,14 @@ def run_with_map(root: str | Path, col_map: Dict[str, List[str]], apply_changes:
             vals = [str(s).strip() for s in seq if str(s).strip()]
             if vals:
                 norm[key] = vals
-    return _process(root_path, norm, bool(apply_changes))
+    # Get output folder path
+    from datetime import datetime
+    import os
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    script_dir = Path(os.path.dirname(__file__))
+    output_root = script_dir / "Outputs" / timestamp
+    acted = _process(root_path, norm, bool(apply_changes))
+    return str(output_root)
 
 def _copy_final_to_all_colours(files: List[Path], colour_dirs: Dict[str, Path], order: List[str], apply: bool) -> None:
     """Copy the last (naturally sorted) image into every colour folder.

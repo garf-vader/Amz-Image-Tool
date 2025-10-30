@@ -109,30 +109,37 @@ def _plan_pairs_for_leaf(root: str, leaf: str, mapping: List[int]) -> List[Tuple
     return pairs
 
 def _two_phase_rename(pairs: List[Tuple[str, str]], apply: bool, log: bool):
-    """Rename inside one leaf with a collision-free two-phase swap."""
+    """Copy renamed files to Outputs/timestamp instead of renaming in place."""
     if not pairs:
         return
-    # phase 1: to tmp names
-    tmp_pairs: List[Tuple[str, str]] = []
+    from datetime import datetime
+    import shutil
+    import os
+    script_dir = os.path.dirname(__file__)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # Get the root argument from the caller (run_with_map)
+    import inspect
+    frame = inspect.currentframe()
+    while frame:
+        if 'root' in frame.f_locals:
+            input_root = frame.f_locals['root']
+            break
+        frame = frame.f_back
+    else:
+        input_root = None
+    if input_root is None:
+        raise RuntimeError("Could not determine input root for output structure.")
+    input_root = os.path.abspath(str(input_root))
+    output_root = os.path.join(script_dir, "Outputs", timestamp)
+    os.makedirs(output_root, exist_ok=True)
     for src, final_dst in pairs:
-        if src == final_dst:
-            continue
-        ext = os.path.splitext(src)[1].lower()
-        tmp_dst = os.path.join(os.path.dirname(src), f".renametmp_{uuid.uuid4().hex}{ext}")
-        if log and not apply:
-            print(f"DRY: {src}  ->  {final_dst}")
-        if apply:
-            os.replace(src, tmp_dst)  # faster than Path.rename and fine on same volume
-        tmp_pairs.append((tmp_dst, final_dst))
-
-    # phase 2: tmp -> final with overwrite guard
-    planned_dests = {final for _, final in tmp_pairs}
-    for tmp_dst, final_dst in tmp_pairs:
-        if apply:
-            # If some unexpected file exists at final that we didn't plan to overwrite, bail out
-            if os.path.exists(final_dst) and final_dst not in planned_dests:
-                raise RuntimeError(f"Destination already exists: {final_dst}")
-            os.replace(tmp_dst, final_dst)
+        # Preserve full input structure under Outputs/timestamp
+        rel_path = os.path.relpath(src, input_root)
+        out_dir = os.path.join(output_root, os.path.dirname(rel_path))
+        os.makedirs(out_dir, exist_ok=True)
+        dst_name = os.path.basename(final_dst)
+        out_path = os.path.join(out_dir, dst_name)
+        shutil.copy2(src, out_path)
 
 def _norm_map_keys(pt_map: Dict[str, List[int]]) -> Dict[str, List[int]]:
     out: Dict[str, List[int]] = {}
@@ -151,7 +158,7 @@ def run_with_map(
     allow_parallel: bool = True,
 ) -> int:
     """
-    Returns: number of leaf directories that had any planned renames.
+    Returns: output folder path.
     """
     root_path = Path(root).resolve()
     root_str = str(root_path)
@@ -189,8 +196,13 @@ def run_with_map(
                 results.append((leaf, pairs))
 
     # Perform renames per-leaf (sequential keeps it simple/safe)
+    from datetime import datetime
+    import os
+    script_dir = os.path.dirname(__file__)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_root = os.path.join(script_dir, "Outputs", timestamp)
     acted = 0
     for leaf, pairs in results:
         _two_phase_rename(pairs, apply=bool(apply_changes), log=dry_run_log)
         acted += 1
-    return acted
+    return output_root

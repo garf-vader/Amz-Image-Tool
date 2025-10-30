@@ -17,6 +17,7 @@ combined_ui.py — Combined workflow (no file I/O for maps)
 UI kept similar to your originals, but JSON writing is removed.
 """
 
+
 import os
 import sys
 import importlib
@@ -24,6 +25,7 @@ import shutil
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import List, Optional
+from datetime import datetime
 
 from ui_utils import (
     IMAGE_EXTS,
@@ -57,6 +59,14 @@ def _call_optional(func_name: str, *args, **kwargs):
         pass
     return None
 
+
+def get_output_root(base_dir):
+    import os
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    script_dir = os.path.dirname(__file__)
+    output_root = os.path.join(script_dir, "Outputs", timestamp)
+    os.makedirs(output_root, exist_ok=True)
+    return output_root
 
 # ====================== Phase A: Colour Planner ======================
 class ColorPhase(tk.Frame):
@@ -115,10 +125,14 @@ class ColorPhase(tk.Frame):
         self.status = tk.Label(self, text="", anchor="w"); self.status.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0,6))
 
     # ---- Root / Leaves ----
+
     def pick_root(self):
         path = filedialog.askdirectory(title="Choose TOP-LEVEL folder")
         if not path:
             return
+
+        # Create timestamped output folder
+        self.output_root = get_output_root(path)
 
         # === NEW: Ask user whether to skip colour phase ===
         if messagebox.askyesno(
@@ -143,6 +157,7 @@ class ColorPhase(tk.Frame):
         self._update_label()
 
 
+
     def _load_leaf(self, idx: int):
         self.leaf_idx = idx
         self.dir_path = self.leaf_dirs[idx]
@@ -150,6 +165,12 @@ class ColorPhase(tk.Frame):
         names.sort(key=natural_key)
         self.items = [ThumbItem(os.path.join(self.dir_path,f), i) for i,f in enumerate(names)]
         self.apply_colors(); self.btn_next.config(state=tk.NORMAL)
+        # Copy images to output folder (preserving structure)
+        rel_path = os.path.relpath(self.dir_path, self.top_dir).replace("\\", "/")
+        output_leaf_dir = os.path.join(self.output_root, rel_path)
+        os.makedirs(output_leaf_dir, exist_ok=True)
+        for item in self.items:
+            shutil.copy2(item.path, output_leaf_dir)
 
     def _update_label(self):
         if self.leaf_dirs:
