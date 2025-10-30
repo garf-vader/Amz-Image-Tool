@@ -1,20 +1,25 @@
+
 #!/usr/bin/env python3
+from __future__ import annotations
+import sys
+import re
+import os
+import csv
+from pathlib import Path
+
 """
 amz_rename.py
 
 Runs Amazon image renaming logic within the current working directory.
 
 Usage:
-  python amz_rename.py <root>
+    python amz_rename.py <root>
 
 Behavior:
-  - Looks for 'sku2asin.csv' in the current working directory.
-  - Operates on the <root> subdirectory inside the current working directory.
-  - Ignores where this script physically resides.
+    - Looks for 'sku2asin.csv' in the current working directory.
+    - Operates on the <root> subdirectory inside the current working directory.
+    - Ignores where this script physically resides.
 """
-from __future__ import annotations
-import sys, re, os, csv
-from pathlib import Path
 
 
 def _load_sku2asin_csv(ASIN_RE) -> dict[str, str]:
