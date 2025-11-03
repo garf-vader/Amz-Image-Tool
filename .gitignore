@@ -209,5 +209,6 @@ __marimo__/
 # Ignore input images and output images
 /Inputs/
 /Outputs/
+/Front Images/
 sku2asin.csv
 .vscode/settings.json
