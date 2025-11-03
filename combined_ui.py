@@ -16,8 +16,6 @@ combined_ui.py — Combined workflow (no file I/O for maps)
 UI kept similar to your originals, but JSON writing is removed.
 """
 
-
-
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from color_phase import ColorPhase
@@ -135,8 +133,11 @@ class CombinedApp(tk.Tk):
         self._show_phase(OrderPhase, self._on_order_done)
 
     def _on_order_done(self, pt_output=None):
+        # Use pt_output as the target if available, otherwise fall back to input_folder
+        target_folder = pt_output if pt_output else self.input_folder
+        
         if self.front_images.get() and self.front_image_folder:
-            run_front_images(self.input_folder, self.front_image_folder)
+            run_front_images(target_folder, self.front_image_folder)
         if pt_output and self.amz_rename.get():
             import amz_rename
             try:
