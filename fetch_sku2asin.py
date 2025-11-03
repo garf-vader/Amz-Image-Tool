@@ -30,4 +30,4 @@ output_file = "sku2asin.csv"
 with open(output_file, "w", encoding="utf-8") as f:
     f.write(response.text)
 
-print(f"✅ Dataset saved as: {output_file}")
+print(f"Dataset saved as: {output_file}")
