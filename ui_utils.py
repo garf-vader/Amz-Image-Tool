@@ -14,8 +14,10 @@ import re
 import hashlib
 from typing import Iterable, List, Optional
 
-import tkinter as tk
-from PIL import Image, ImageTk
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
+from PIL import Image
+from PIL.ImageQt import ImageQt
 
 # --------- shared constants ---------
 IMAGE_EXTS: set[str] = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff"}
@@ -63,7 +65,7 @@ class ThumbItem:
         self.assigned_color: str = ""
 
     def load_thumb(self):
-        """Load and cache a Tk-compatible thumbnail from disk."""
+        """Load and cache a Qt-compatible thumbnail from disk."""
         if self.thumb is None:
             img = Image.open(self.path)
             img.thumbnail(THUMB_SIZE, Image.LANCZOS)
@@ -71,7 +73,19 @@ class ThumbItem:
                 bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
                 bg.paste(img, (0, 0), img)
                 img = bg.convert("RGB")
-            self.thumb = ImageTk.PhotoImage(img)
+            elif img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            qimage = ImageQt(img)
+            pixmap = QPixmap.fromImage(qimage)
+            if not pixmap.isNull():
+                self.thumb = pixmap.scaled(
+                    THUMB_SIZE[0],
+                    THUMB_SIZE[1],
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+            else:
+                self.thumb = QPixmap()
         return self.thumb
 
 
@@ -134,26 +148,3 @@ def folder_key(path: str, segments: int = 3, drop_last: bool = True) -> str:
         parts = parts[-segments:]
     return "/".join(parts)
     
-def col_order_complete(app: tk.Tk):
-    """
-    Called when all pt_order/VintageWallet models have been processed.
-    Default behaviour: destroy the Tk app window (ends mainloop).
-    """
-    try:
-        app.destroy()
-    except Exception:
-        pass
-    # If you also want to terminate Python explicitly:
-    # sys.exit(0)
-
-def pt_order_complete(app: tk.Tk):
-    """
-    Called when all pt_order/VintageWallet models have been processed.
-    Default behaviour: destroy the Tk app window (ends mainloop).
-    """
-    try:
-        app.destroy()
-    except Exception:
-        pass
-    # If you also want to terminate Python explicitly:
-    # sys.exit(0)
