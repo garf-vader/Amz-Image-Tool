@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
@@ -48,6 +48,8 @@ class CombinedApp(QMainWindow):
         self.phase_widget: QWidget | None = None
         self.input_folder: str | None = None
         self.front_image_folder: str | None = None
+        self.fetch_completed: bool = False
+        self._pending_pt_output: str | None = None
 
         self._start_menu()
 
@@ -70,10 +72,6 @@ class CombinedApp(QMainWindow):
         font.setPointSize(16)
         title.setFont(font)
         layout.addWidget(title)
-
-        fetch_btn = QPushButton("Fetch sku2asin")
-        fetch_btn.clicked.connect(self._fetch_sku2asin)
-        layout.addWidget(fetch_btn)
 
         self.colours_sorted_chk = QCheckBox("Colours are already sorted")
         layout.addWidget(self.colours_sorted_chk)
@@ -102,13 +100,19 @@ class CombinedApp(QMainWindow):
         input_row.addWidget(pick_input)
         layout.addLayout(input_row)
 
-        self.amz_rename_chk = QCheckBox("Run amz_rename after ordering")
-        layout.addWidget(self.amz_rename_chk)
+        actions_row = QHBoxLayout()
+        self.fetch_btn = QPushButton("Fetch sku2asin")
+        self.fetch_btn.clicked.connect(self._fetch_sku2asin)
+        actions_row.addWidget(self.fetch_btn)
+
+        actions_row.addStretch(1)
 
         self.start_btn = QPushButton("Start")
         self.start_btn.setEnabled(False)
         self.start_btn.clicked.connect(self._start_workflow)
-        layout.addWidget(self.start_btn)
+        actions_row.addWidget(self.start_btn)
+
+        layout.addLayout(actions_row)
 
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -130,12 +134,12 @@ class CombinedApp(QMainWindow):
             self.input_folder = folder
             self.input_label.setText(f"Input: {os.path.basename(folder)}")
             self.input_label.setStyleSheet("color: green;")
-            self.start_btn.setEnabled(True)
+            self._update_start_enabled()
         else:
             self.input_folder = None
             self.input_label.setText("No input folder selected")
             self.input_label.setStyleSheet("color: red;")
-            self.start_btn.setEnabled(False)
+            self._update_start_enabled()
 
     def _pick_front_image_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Choose FRONT IMAGES folder")
@@ -150,8 +154,19 @@ class CombinedApp(QMainWindow):
 
     def _fetch_sku2asin(self) -> None:
         result = subprocess.run([sys.executable, "fetch_sku2asin.py"], capture_output=True, text=True)
-        message = result.stdout.strip() or "Done."
-        QMessageBox.information(self, "sku2asin fetch", message)
+        if result.returncode == 0:
+            self.fetch_completed = True
+            message = result.stdout.strip() or "Done."
+            QMessageBox.information(self, "sku2asin fetch", message)
+        else:
+            self.fetch_completed = False
+            stderr = result.stderr.strip()
+            message = stderr or "fetch_sku2asin failed."
+            QMessageBox.critical(self, "sku2asin fetch", message)
+        self._update_start_enabled()
+
+    def _update_start_enabled(self) -> None:
+        self.start_btn.setEnabled(bool(self.input_folder) and self.fetch_completed)
 
     def _start_workflow(self) -> None:
         if not self.input_folder:
@@ -175,9 +190,27 @@ class CombinedApp(QMainWindow):
         self._show_phase(OrderPhase, self._on_order_done)
 
     def _on_order_done(self, pt_output: str | None = None) -> None:
+        self._pending_pt_output = pt_output
+        self._show_processing_screen()
+        QTimer.singleShot(0, self._finish_processing)
+
+    def _show_processing_screen(self) -> None:
+        processing = QWidget()
+        layout = QVBoxLayout(processing)
+        layout.setAlignment(Qt.AlignCenter)
+        label = QLabel("Sorting complete, processing")
+        font = QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        label.setFont(font)
+        layout.addWidget(label)
+        self._set_central(processing)
+
+    def _finish_processing(self) -> None:
         if self.front_images_chk.isChecked() and self.front_image_folder and self.input_folder:
             run_front_images(self.input_folder, self.front_image_folder, self)
-        if pt_output and self.amz_rename_chk.isChecked():
+        pt_output = self._pending_pt_output
+        if pt_output:
             try:
                 import amz_rename
 
