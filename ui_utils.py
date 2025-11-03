@@ -15,9 +15,8 @@ import hashlib
 from typing import Iterable, List, Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QImage, QPixmap
 from PIL import Image
-from PIL.ImageQt import ImageQt
 
 # --------- shared constants ---------
 IMAGE_EXTS: set[str] = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff"}
@@ -69,13 +68,35 @@ class ThumbItem:
         if self.thumb is None:
             img = Image.open(self.path)
             img.thumbnail(THUMB_SIZE, Image.LANCZOS)
-            if img.mode in ("RGBA", "LA"):
-                bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
-                bg.paste(img, (0, 0), img)
-                img = bg.convert("RGB")
-            elif img.mode not in ("RGB", "RGBA"):
-                img = img.convert("RGB")
-            qimage = ImageQt(img)
+            mode = img.mode
+            if mode not in ("RGB", "RGBA"):
+                if mode in ("LA", "P"):
+                    img = img.convert("RGBA")
+                else:
+                    img = img.convert("RGB")
+                mode = img.mode
+
+            if mode == "RGBA":
+                data = img.tobytes("raw", "RGBA")
+                qimage = QImage(
+                    data,
+                    img.width,
+                    img.height,
+                    img.width * 4,
+                    QImage.Format_RGBA8888,
+                )
+            else:  # RGB
+                if mode != "RGB":
+                    img = img.convert("RGB")
+                data = img.tobytes("raw", "RGB")
+                qimage = QImage(
+                    data,
+                    img.width,
+                    img.height,
+                    img.width * 3,
+                    QImage.Format_RGB888,
+                )
+
             pixmap = QPixmap.fromImage(qimage)
             if not pixmap.isNull():
                 self.thumb = pixmap.scaled(
