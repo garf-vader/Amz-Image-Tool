@@ -1,5 +1,6 @@
 import os
 import shutil
+from functools import partial
 from typing import List
 
 from PyQt5.QtCore import Qt
@@ -38,6 +39,7 @@ class ColorPhase(QWidget):
         self.on_complete = on_complete
 
         self.col_map: dict[str, list[str]] = {}
+        self.clone_map: dict[str, str] = {}
 
         self.top_dir = root_dir
         self.dir_path = ""
@@ -134,6 +136,7 @@ class ColorPhase(QWidget):
         self.apply_colors()
         self.btn_next.setEnabled(True)
         self._copy_to_output()
+        self._refresh_status()
 
     def _copy_to_output(self) -> None:
         rel_path = os.path.relpath(self.dir_path, self.top_dir).replace("\\", "/")
@@ -184,18 +187,19 @@ class ColorPhase(QWidget):
 
     def apply_colors(self) -> None:
         cols = self._get_sequence()
-        if not cols:
-            self.status.setText("Enter at least one colour to assign.")
-        else:
-            self.status.setText("")
         for idx, item in enumerate(self.items):
             item.assigned_color = cols[idx % len(cols)] if cols else ""
         self._render_list()
+        self._refresh_status(cols)
 
     def _create_item_row(self, idx: int, item: ThumbItem) -> QFrame:
         row = QFrame()
         row.setFrameShape(QFrame.StyledPanel)
-        row.setStyleSheet("background-color: #ffffff;")
+
+        is_clone = self._current_clone_name() == item.name
+        bg_colour = "#fff7e6" if is_clone else "#ffffff"
+        border_colour = "#f0c36d" if is_clone else "#cccccc"
+        row.setStyleSheet(f"background-color: {bg_colour}; border: 1px solid {border_colour};")
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(8, 8, 8, 8)
         row_layout.setSpacing(12)
@@ -227,9 +231,18 @@ class ColorPhase(QWidget):
         meta_layout.addWidget(badge)
 
         meta_layout.addWidget(QLabel(os.path.basename(item.path)))
+        if is_clone:
+            clone_note = QLabel("Clone source")
+            clone_note.setStyleSheet("color: #a46900; font-style: italic;")
+            meta_layout.addWidget(clone_note)
         meta_layout.addStretch(1)
 
         row_layout.addWidget(meta, stretch=1)
+        clone_btn = QPushButton("Clone to all colours")
+        clone_btn.setCheckable(True)
+        clone_btn.setChecked(is_clone)
+        clone_btn.clicked.connect(partial(self._handle_clone_clicked, item))
+        row_layout.addWidget(clone_btn)
         return row
 
     def _clear_list(self) -> None:
@@ -246,6 +259,44 @@ class ColorPhase(QWidget):
             self.list_layout.addWidget(row)
             self.row_widgets.append(row)
         self.list_layout.addStretch(1)
+
+    def _current_rel_key(self) -> str:
+        if not (self.top_dir and self.dir_path):
+            return ""
+        return os.path.relpath(self.dir_path, self.top_dir).replace("\\", "/").strip("/")
+
+    def _current_clone_name(self) -> str:
+        rel = self._current_rel_key()
+        return self.clone_map.get(rel, "")
+
+    def _handle_clone_clicked(self, item: ThumbItem, checked: bool) -> None:
+        if checked:
+            self._set_clone_item(item)
+        elif self._current_clone_name() == item.name:
+            self._set_clone_item(None)
+        else:
+            self._refresh_status()
+
+    def _set_clone_item(self, item: ThumbItem | None) -> None:
+        rel = self._current_rel_key()
+        if not rel:
+            return
+        if item is None:
+            self.clone_map.pop(rel, None)
+        else:
+            self.clone_map[rel] = item.name
+        self._render_list()
+        self._refresh_status()
+
+    def _refresh_status(self, cols: list[str] | None = None) -> None:
+        cols = cols if cols is not None else self._get_sequence()
+        parts: list[str] = []
+        if not cols:
+            parts.append("Enter at least one colour to assign.")
+        clone_name = self._current_clone_name()
+        if clone_name:
+            parts.append(f"Clone image: {clone_name}")
+        self.status.setText(" • ".join(parts))
 
     def _remember_current_leaf_colors(self) -> None:
         if not (self.top_dir and self.dir_path):
@@ -273,7 +324,12 @@ class ColorPhase(QWidget):
         try:
             import colour_sorter
 
-            colour_output = colour_sorter.run_with_map(self.top_dir, self.col_map, apply_changes=True)
+            colour_output = colour_sorter.run_with_map(
+                self.top_dir,
+                self.col_map,
+                apply_changes=True,
+                clone_map=self.clone_map,
+            )
         except Exception as exc:  # pragma: no cover - defensive
             QMessageBox.critical(self, "colour_sorter failed", str(exc))
             colour_output = self.top_dir

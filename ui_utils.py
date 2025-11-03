@@ -97,7 +97,7 @@ class ThumbItem:
                     QImage.Format_RGB888,
                 )
 
-            pixmap = QPixmap.fromImage(qimage)
+            pixmap = QPixmap.fromImage(qimage.copy())
             if not pixmap.isNull():
                 self.thumb = pixmap.scaled(
                     THUMB_SIZE[0],

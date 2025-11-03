@@ -195,7 +195,6 @@ class OrderPhase(QWidget):
             widget = ItemRowWidget(item, idx)
             list_item = QListWidgetItem()
             list_item.setSizeHint(widget.sizeHint())
-            list_item.setData(Qt.UserRole, item)
             self.list_widget.addItem(list_item)
             self.list_widget.setItemWidget(list_item, widget)
 
@@ -230,11 +229,9 @@ class OrderPhase(QWidget):
         for row in range(self.list_widget.count()):
             list_item = self.list_widget.item(row)
             widget = self.list_widget.itemWidget(list_item)
-            thumb = list_item.data(Qt.UserRole)
             if isinstance(widget, ItemRowWidget):
                 widget.update_index(row)
-            if isinstance(thumb, ThumbItem):
-                new_items.append(thumb)
+                new_items.append(widget.item)
         self.items = new_items
         self.status.setText("Reordered items")
 
