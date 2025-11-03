@@ -187,8 +187,16 @@ class ColorPhase(QWidget):
 
     def apply_colors(self) -> None:
         cols = self._get_sequence()
-        for idx, item in enumerate(self.items):
-            item.assigned_color = cols[idx % len(cols)] if cols else ""
+        clone_name = self._current_clone_name()
+        seq_idx = 0
+        for item in self.items:
+            if clone_name and item.name == clone_name:
+                item.assigned_color = "Clone"
+            elif cols:
+                item.assigned_color = cols[seq_idx % len(cols)]
+                seq_idx += 1
+            else:
+                item.assigned_color = ""
         self._render_list()
         self._refresh_status(cols)
 
@@ -285,8 +293,7 @@ class ColorPhase(QWidget):
             self.clone_map.pop(rel, None)
         else:
             self.clone_map[rel] = item.name
-        self._render_list()
-        self._refresh_status()
+        self.apply_colors()
 
     def _refresh_status(self, cols: list[str] | None = None) -> None:
         cols = cols if cols is not None else self._get_sequence()
