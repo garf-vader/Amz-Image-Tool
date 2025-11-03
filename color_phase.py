@@ -31,6 +31,8 @@ class ColorPhase(tk.Frame):
         self.leaf_idx = 0
         self.items: list[ThumbItem] = []
         self.row_widgets: list[tk.Frame] = []
+        self.duplicate_all_vars: list[tk.BooleanVar] = []  # Track which images are "duplicate for all"
+        self.duplicate_indices: dict[str, list[int]] = {}  # Store duplicate indices per leaf path
 
         # --- Top bar ---
         top = tk.Frame(self)
@@ -96,6 +98,7 @@ class ColorPhase(tk.Frame):
         self._copy_to_output()
 
     def _copy_to_output(self):
+        # Legacy method - now handled by colour_sorter with duplicate logic
         rel_path = os.path.relpath(self.dir_path, self.top_dir).replace("\\", "/")
         output_leaf_dir = os.path.join(self.output_root, rel_path)
         os.makedirs(output_leaf_dir, exist_ok=True)
@@ -134,8 +137,27 @@ class ColorPhase(tk.Frame):
 
     def apply_colors(self):
         cols = self._get_sequence()
-        for idx, it in enumerate(self.items):
-            it.assigned_color = cols[idx % len(cols)] if cols else ""
+        if not cols:
+            for it in self.items:
+                it.assigned_color = ""
+            self._render_list()
+            return
+        
+        # Build list of indices that are NOT marked for duplication
+        normal_indices = []
+        for idx in range(len(self.items)):
+            if idx < len(self.duplicate_all_vars) and not self.duplicate_all_vars[idx].get():
+                normal_indices.append(idx)
+        
+        # Assign colors to normal (non-duplicate) items using round-robin
+        for i, idx in enumerate(normal_indices):
+            self.items[idx].assigned_color = cols[i % len(cols)]
+        
+        # Mark duplicate items with a dash
+        for idx in range(len(self.items)):
+            if idx < len(self.duplicate_all_vars) and self.duplicate_all_vars[idx].get():
+                self.items[idx].assigned_color = "—"
+        
         self._render_list()
 
     def _create_item_row(self, idx, item):
@@ -154,20 +176,40 @@ class ColorPhase(tk.Frame):
         tk.Label(meta, text=f"  {cname}  ", bg=badge_bg, bd=1, relief=tk.SOLID).pack(anchor="w")
         tk.Label(meta, text=os.path.basename(item.path), background="#fff").pack(anchor="w")
         
+        # Add checkbox for "duplicate to all colors"
+        dup_var = tk.BooleanVar(value=False)
+        self.duplicate_all_vars.append(dup_var)
+        chk = tk.Checkbutton(meta, text="Duplicate to all colors", variable=dup_var, 
+                            background="#fff", command=lambda: self._on_duplicate_toggle(idx))
+        chk.pack(anchor="w")
+        
         for w in (row, img, meta):
             w.bindtags(("Wheel",) + w.bindtags())
         return row
 
     def _render_list(self):
+        # Save current checkbox states before destroying widgets
+        saved_states = [var.get() for var in self.duplicate_all_vars]
+        
         for w in self.list_frame.winfo_children():
             w.destroy()
         self.row_widgets = []
+        self.duplicate_all_vars = []  # Reset duplicate tracking
+        
         for idx, item in enumerate(self.items):
             row = self._create_item_row(idx, item)
             row.pack(fill=tk.X, padx=4, pady=ROW_PAD_Y)
             self.row_widgets.append(row)
+            # Restore saved state if available
+            if idx < len(saved_states):
+                self.duplicate_all_vars[idx].set(saved_states[idx])
+        
         self.list_frame.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_duplicate_toggle(self, idx):
+        """Called when duplicate checkbox is toggled - update color assignments."""
+        self.apply_colors()
 
     def _remember_current_leaf_colors(self):
         if not (self.top_dir and self.dir_path):
@@ -178,6 +220,16 @@ class ColorPhase(tk.Frame):
             self.col_map[rel] = seq
         elif rel in self.col_map:
             self.col_map.pop(rel, None)
+        
+        # Store which images are marked for duplication to all colors
+        dup_indices = []
+        for idx, var in enumerate(self.duplicate_all_vars):
+            if var.get():
+                dup_indices.append(idx)
+        if dup_indices:
+            self.duplicate_indices[rel] = dup_indices
+        elif rel in self.duplicate_indices:
+            self.duplicate_indices.pop(rel, None)
 
     def next_model(self):
         if not self.items:
@@ -194,7 +246,12 @@ class ColorPhase(tk.Frame):
         messagebox.showinfo("Batch complete", "Recorded colour sequences for all leaf folders.")
         try:
             import colour_sorter
-            colour_output = colour_sorter.run_with_map(self.top_dir, self.col_map, apply_changes=True)
+            colour_output = colour_sorter.run_with_map(
+                self.top_dir, 
+                self.col_map, 
+                apply_changes=True,
+                duplicate_indices=self.duplicate_indices
+            )
         except Exception as e:
             messagebox.showerror("colour_sorter failed", str(e))
             colour_output = self.top_dir

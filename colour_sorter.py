@@ -76,7 +76,8 @@ def _move_round_robin(files: List[Path], colour_dirs: Dict[str, Path], order: Li
                 pass
 
 
-def _process(root: Path, col_map: Dict[str, List[str]], apply: bool) -> int:
+def _process(root: Path, col_map: Dict[str, List[str]], apply: bool, 
+             duplicate_indices: Dict[str, List[int]]) -> int:
     # Create timestamped output folder
     import os
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -100,6 +101,19 @@ def _process(root: Path, col_map: Dict[str, List[str]], apply: bool) -> int:
         if not files:
             continue
 
+        # Get list of indices to duplicate to all colors
+        dup_indices = set(duplicate_indices.get(rel_posix, []))
+        
+        # Separate normal files from duplicate-to-all files
+        # Important: We skip duplicate-to-all images in the color sequence
+        normal_files = []
+        duplicate_all_files = []
+        for i, f in enumerate(files):
+            if i in dup_indices:
+                duplicate_all_files.append(f)
+            else:
+                normal_files.append(f)
+
         # Create output dirs for colours
         out_dirs = {}
         for c in colours:
@@ -110,9 +124,11 @@ def _process(root: Path, col_map: Dict[str, List[str]], apply: bool) -> int:
             d.mkdir(parents=True, exist_ok=True)
             out_dirs[name] = d
 
-        # Copy files round-robin to output dirs
+        # Copy normal files round-robin to output dirs
+        # These files get their color assignment based on their position in the FILTERED list
+        # (skipping the duplicate-to-all images)
         k = len(colours)
-        for i, src in enumerate(files):
+        for i, src in enumerate(normal_files):
             colour = colours[i % k].strip()
             if not colour:
                 continue
@@ -121,11 +137,28 @@ def _process(root: Path, col_map: Dict[str, List[str]], apply: bool) -> int:
                 continue
             dst = dst_dir / src.name
             shutil.copy2(src, dst)
+        
+        # Copy duplicate-to-all files to every color folder (placed last)
+        for src in duplicate_all_files:
+            for colour, dst_dir in out_dirs.items():
+                dst = dst_dir / src.name
+                shutil.copy2(src, dst)
+        
         acted += 1
     return acted
 
 
-def run_with_map(root: str | Path, col_map: Dict[str, List[str]], apply_changes: bool = True) -> int:
+def run_with_map(root: str | Path, col_map: Dict[str, List[str]], apply_changes: bool = True, 
+                 duplicate_indices: Dict[str, List[int]] = None) -> int:
+    """
+    Run color sorting with optional duplicate-to-all logic.
+    
+    Args:
+        root: Root directory path
+        col_map: Mapping of relative paths to color sequences
+        apply_changes: Whether to actually move files
+        duplicate_indices: Dict mapping relative paths to list of image indices that should be duplicated to all colors
+    """
     root_path = Path(root).resolve()
     norm: Dict[str, List[str]] = {}
     for rel, seq in col_map.items():
@@ -140,7 +173,7 @@ def run_with_map(root: str | Path, col_map: Dict[str, List[str]], apply_changes:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     script_dir = Path(os.path.dirname(__file__))
     output_root = script_dir / "Outputs" / timestamp
-    acted = _process(root_path, norm, bool(apply_changes))
+    acted = _process(root_path, norm, bool(apply_changes), duplicate_indices or {})
     return str(output_root)
 
 def _copy_final_to_all_colours(files: List[Path], colour_dirs: Dict[str, Path], order: List[str], apply: bool) -> None:
