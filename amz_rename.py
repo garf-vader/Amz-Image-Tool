@@ -137,12 +137,12 @@ def process_root(root: str | Path) -> int:
     if not root_path.is_dir():
         raise NotADirectoryError(f"Not a directory: {root_path}")
 
-    # Create timestamped output folder
+    # Create timestamped Renamed folder
     import os
     from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d")
     script_dir = Path(os.path.dirname(__file__))
-    output_root = script_dir / "Outputs" / timestamp
+    output_root = script_dir / "Outputs" / f"{timestamp}_Renamed"
     output_root.mkdir(parents=True, exist_ok=True)
 
     total = 0
@@ -193,7 +193,86 @@ def process_root(root: str | Path) -> int:
         print(f"Copied: {file_path} -> {target_path}")
         total += 1
     print(f"🎯 Finished. Total files copied: {total}")
+    
+    # Create zip archives if files were copied
+    if total > 0:
+        create_zip_archives(output_root)
+    
     return str(output_root)
+
+
+def create_zip_archives(output_root: Path) -> None:
+    """
+    Create 1GB zip archives from the Renamed output folder.
+    Splits files into the fewest number of 1GB groupings.
+    """
+    import zipfile
+    from datetime import datetime
+    
+    MAX_ZIP_SIZE = 1 * 1024 * 1024 * 1024  # 1GB in bytes
+    # Extract timestamp from folder name (e.g., "20251030_Renamed" -> "20251030")
+    timestamp = output_root.name.replace("_Renamed", "")
+    
+    # Collect all files with their sizes
+    files_with_sizes = []
+    for file_path in output_root.rglob("*"):
+        if file_path.is_file():
+            try:
+                size = file_path.stat().st_size
+                files_with_sizes.append((file_path, size))
+            except OSError:
+                continue
+    
+    if not files_with_sizes:
+        print("No files to zip.")
+        return
+    
+    # Sort by size (largest first) for better packing
+    files_with_sizes.sort(key=lambda x: x[1], reverse=True)
+    
+    # Group files into bins using first-fit-decreasing algorithm
+    bins = []
+    bin_sizes = []
+    
+    for file_path, size in files_with_sizes:
+        # Try to fit in an existing bin
+        placed = False
+        for i, bin_size in enumerate(bin_sizes):
+            if bin_size + size <= MAX_ZIP_SIZE:
+                bins[i].append((file_path, size))
+                bin_sizes[i] += size
+                placed = True
+                break
+        
+        # Create new bin if needed
+        if not placed:
+            bins.append([(file_path, size)])
+            bin_sizes.append(size)
+    
+    # Create zip files in the Outputs folder (same level as Renamed folder)
+    zip_dir = output_root.parent
+    
+    print(f"\n📦 Creating {len(bins)} zip archive(s)...")
+    
+    for idx, bin_files in enumerate(bins, start=1):
+        zip_name = f"{timestamp}_part{idx}.zip"
+        zip_path = zip_dir / zip_name
+        
+        total_size = sum(size for _, size in bin_files)
+        size_mb = total_size / (1024 * 1024)
+        
+        print(f"Creating {zip_name} ({size_mb:.1f} MB, {len(bin_files)} files)...")
+        
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for file_path, _ in bin_files:
+                # Preserve directory structure relative to the Renamed folder
+                arcname = file_path.relative_to(output_root)
+                zf.write(file_path, arcname)
+        
+        print(f"✓ Created: {zip_path}")
+    
+    print(f"\n✅ All archives created in: {zip_dir}")
+    print(f"   Source folder: {output_root}")
 
 
 run = process_root
