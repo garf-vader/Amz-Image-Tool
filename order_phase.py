@@ -3,7 +3,7 @@ import os
 from typing import List, Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QGuiApplication
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -132,11 +132,6 @@ class OrderPhase(QWidget):
         bottom = QHBoxLayout()
         self.status = QLabel("")
         bottom.addWidget(self.status, stretch=1)
-
-        copy_btn = QPushButton("Copy mapping")
-        copy_btn.clicked.connect(self.copy_mapping)
-        bottom.addWidget(copy_btn)
-
         layout.addLayout(bottom)
 
     # ------------------------------------------------------------------
@@ -210,13 +205,6 @@ class OrderPhase(QWidget):
         rel_leaf = os.path.relpath(self.dir_path, self.root_dir).replace("\\", "/").strip("/")
         base_rel = os.path.dirname(rel_leaf)
         self.pt_map[base_rel] = self._mapping_original_to_desired()
-
-    def copy_mapping(self) -> None:
-        if not self.items:
-            return
-        clipboard = QGuiApplication.clipboard()
-        clipboard.setText(json.dumps(self._mapping_original_to_desired()))
-        self.status.setText("Mapping (original→new) copied to clipboard")
 
     def _update_progress_label(self) -> None:
         if self.vw_queue and 0 <= self.vw_idx < len(self.vw_queue):
