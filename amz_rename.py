@@ -6,6 +6,7 @@ import re
 import os
 import csv
 from pathlib import Path
+from ui_utils import get_executable_dir
 
 """
 amz_rename.py
@@ -145,7 +146,7 @@ def process_root(root: str | Path) -> str:
         timestamp = root_path.name
     else:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    script_dir = Path(os.path.dirname(__file__))
+    script_dir = Path(get_executable_dir())
     output_root = script_dir / "Outputs" / f"{timestamp}_Renamed"
     output_root.mkdir(parents=True, exist_ok=True)
 
