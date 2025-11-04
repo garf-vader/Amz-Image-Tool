@@ -197,7 +197,9 @@ class OrderPhase(QWidget):
         inv = [None] * len(self.items)
         for new_pos, it in enumerate(self.items):
             inv[it.orig_index] = new_pos
-        return [i if i is not None else -1 for i in inv]
+        if any(i is None for i in inv):
+            raise ValueError("Invalid mapping: None value encountered in mapping. This indicates a bug in the mapping logic or input data.")
+        return inv
 
     def _remember_current_leaf_mapping(self) -> None:
         if not (self.root_dir and self.dir_path and self.items):
