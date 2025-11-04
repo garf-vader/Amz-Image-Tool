@@ -78,22 +78,22 @@ class ThumbItem:
 
             if mode == "RGBA":
                 data = img.tobytes("raw", "RGBA")
+                self._image_data = data  # Keep buffer alive for QImage
                 qimage = QImage(
-                    data,
+                    self._image_data,
                     img.width,
                     img.height,
-                    img.width * 4,
                     QImage.Format_RGBA8888,
                 )
             else:  # RGB
                 if mode != "RGB":
                     img = img.convert("RGB")
                 data = img.tobytes("raw", "RGB")
+                self._image_data = data  # Keep buffer alive for QImage
                 qimage = QImage(
-                    data,
+                    self._image_data,
                     img.width,
                     img.height,
-                    img.width * 3,
                     QImage.Format_RGB888,
                 )
 
