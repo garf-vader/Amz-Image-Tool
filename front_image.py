@@ -15,24 +15,37 @@ def copy_front_images(front_images_dir: str, root_dir: str) -> dict:
     """
     copied = 0
     skipped = 0
+    print(f"\n🔍 Copying front images from: {front_images_dir}")
+    print(f"🔍 Into root directory: {root_dir}")
+    
     for dirpath, _, files in os.walk(front_images_dir):
         for fname in files:
             name, ext = os.path.splitext(fname)
-            if ext.lower() != ".jpg":
+            if ext.lower() not in {".jpg", ".jpeg", ".png"}:
                 continue
             colour = name.strip()
             rel = os.path.relpath(dirpath, front_images_dir).replace("\\", "/").strip("/")
             target_dir = os.path.join(root_dir, rel, colour)
+            
+            print(f"  📁 Looking for: {target_dir}")
+            
             if not os.path.isdir(target_dir):
+                print(f"  ⚠️  Directory not found, skipping: {colour}")
                 skipped += 1
                 continue
+            
             src = os.path.join(dirpath, fname)
             dst = os.path.join(target_dir, "MAIN.jpg")
+            
             try:
                 shutil.copy2(src, dst)
+                print(f"  ✅ Copied {fname} -> {dst}")
                 copied += 1
-            except Exception:
+            except Exception as e:
+                print(f"  ❌ Failed to copy {fname}: {e}")
                 skipped += 1
+    
+    print(f"\n✨ Front images: {copied} copied, {skipped} skipped\n")
     return {'copied': copied, 'skipped': skipped}
 """
 front_image.py
