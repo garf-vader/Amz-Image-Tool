@@ -18,32 +18,45 @@ def copy_front_images(front_images_dir: str, root_dir: str) -> dict:
     """
     copied = 0
     skipped = 0
+    print(f"\n🔍 Copying front images from: {front_images_dir}")
+    print(f"🔍 Into root directory: {root_dir}")
+    
     for dirpath, _, files in os.walk(front_images_dir):
         for fname in files:
             name, ext = os.path.splitext(fname)
-            if ext.lower() not in IMAGE_EXTS:
-                # skip non-image files
+            if ext.lower() not in {".jpg", ".jpeg", ".png"}:
                 continue
             colour = name.strip()
             rel = os.path.relpath(dirpath, front_images_dir).replace("\\", "/").strip("/")
             target_dir = os.path.join(root_dir, rel, colour)
             
-            # If target_dir doesn't exist, create it if the parent leaf exists
+            print(f"  📁 Looking for: {target_dir}")
+            
             if not os.path.isdir(target_dir):
-                leaf_dir = os.path.join(root_dir, rel)
-                if not os.path.isdir(leaf_dir):
-                    # Leaf doesn't exist, create it
-                    os.makedirs(leaf_dir, exist_ok=True)
-                # Now create the colour subfolder
-                os.makedirs(target_dir, exist_ok=True)
+                print(f"  ⚠️  Directory not found, skipping: {colour}")
+                skipped += 1
+                continue
+            
             src = os.path.join(dirpath, fname)
             dst = os.path.join(target_dir, "MAIN.jpg")
+            
             try:
                 shutil.copy2(src, dst)
+                print(f"  ✅ Copied {fname} -> {dst}")
                 copied += 1
-            except Exception:
+            except Exception as e:
+                print(f"  ❌ Failed to copy {fname}: {e}")
                 skipped += 1
-    return {"copied": copied, "skipped": skipped}
+    
+    print(f"\n✨ Front images: {copied} copied, {skipped} skipped\n")
+    return {'copied': copied, 'skipped': skipped}
+"""
+front_image.py
+
+Logic for identifying and handling the 'front' image in a folder of product images.
+"""
+
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 
 
 def is_image_file(p: Path) -> bool:

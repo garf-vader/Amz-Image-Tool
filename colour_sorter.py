@@ -4,11 +4,12 @@
 Minimal colour sorter — import-only.
 
 Exposes:
-    run_with_map(root, col_map, apply_changes=True) -> int
+    run_with_map(root, col_map, apply_changes=True, *, clone_map=None) -> str
 
 - root: str | Path to the top-level directory
 - col_map: dict[str, list[str]] where keys are leaf paths relative to root (POSIX '/')
 - apply_changes: if False, no files are moved (dry-run)
+- clone_map: optional dict[str, str] mapping leaf paths to image names to clone into every colour folder
 
 Round-robin assigns images in each leaf folder into subfolders named by the colour
 sequence. Hidden files/folders are skipped.
@@ -17,7 +18,7 @@ sequence. Hidden files/folders are skipped.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Iterable
+from typing import Dict, List, Iterable, Optional
 import re
 import shutil
 from datetime import datetime
@@ -76,15 +77,23 @@ def _move_round_robin(files: List[Path], colour_dirs: Dict[str, Path], order: Li
                 pass
 
 
-def _process(root: Path, col_map: Dict[str, List[str]], apply: bool, 
-             duplicate_indices: Dict[str, List[int]]) -> int:
-    # Create timestamped output folder
-    import os
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    script_dir = Path(os.path.dirname(__file__))
-    output_root = script_dir / "Outputs" / timestamp
-    output_root.mkdir(parents=True, exist_ok=True)
+def _process(
+    root: Path,
+    col_map: Dict[str, List[str]],
+    apply: bool,
+    clone_map: Optional[Dict[str, str]] = None,
+    output_root: Optional[Path] = None,
+) -> int:
+    # Use provided output folder or create timestamped one
+    if output_root is None:
+        import os
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        script_dir = Path(os.path.dirname(__file__))
+        output_root = script_dir / "Outputs" / timestamp
+        output_root.mkdir(parents=True, exist_ok=True)
     acted = 0
+    clone_map = clone_map or {}
+
     for rel, seq in col_map.items():
         rel_posix = str(rel).strip().strip("/")
         if not rel_posix:
@@ -137,28 +146,21 @@ def _process(root: Path, col_map: Dict[str, List[str]], apply: bool,
                 continue
             dst = dst_dir / src.name
             shutil.copy2(src, dst)
-        
-        # Copy duplicate-to-all files to every color folder (placed last)
-        for src in duplicate_all_files:
-            for colour, dst_dir in out_dirs.items():
-                dst = dst_dir / src.name
-                shutil.copy2(src, dst)
-        
+
+        clone_name = clone_map.get(rel_posix)
+        if apply and clone_name and out_dirs:
+            _clone_selected_to_all_colours(out_dirs, clone_name)
         acted += 1
     return acted
 
 
-def run_with_map(root: str | Path, col_map: Dict[str, List[str]], apply_changes: bool = True, 
-                 duplicate_indices: Dict[str, List[int]] = None) -> int:
-    """
-    Run color sorting with optional duplicate-to-all logic.
-    
-    Args:
-        root: Root directory path
-        col_map: Mapping of relative paths to color sequences
-        apply_changes: Whether to actually move files
-        duplicate_indices: Dict mapping relative paths to list of image indices that should be duplicated to all colors
-    """
+def run_with_map(
+    root: str | Path,
+    col_map: Dict[str, List[str]],
+    apply_changes: bool = True,
+    *,
+    clone_map: Optional[Dict[str, str]] = None,
+) -> str:
     root_path = Path(root).resolve()
     norm: Dict[str, List[str]] = {}
     for rel, seq in col_map.items():
@@ -167,40 +169,44 @@ def run_with_map(root: str | Path, col_map: Dict[str, List[str]], apply_changes:
             vals = [str(s).strip() for s in seq if str(s).strip()]
             if vals:
                 norm[key] = vals
-    # Get output folder path
+    clone_norm: Dict[str, str] = {}
+    if clone_map:
+        for rel, name in clone_map.items():
+            key = Path(str(rel)).as_posix().strip("/")
+            if key and name:
+                clone_norm[key] = Path(str(name)).name
+    # Create output folder path ONCE at the beginning
     from datetime import datetime
     import os
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     script_dir = Path(os.path.dirname(__file__))
     output_root = script_dir / "Outputs" / timestamp
-    acted = _process(root_path, norm, bool(apply_changes), duplicate_indices or {})
+    output_root.mkdir(parents=True, exist_ok=True)
+    _process(root_path, norm, bool(apply_changes), clone_norm, output_root)
     return str(output_root)
 
-def _copy_final_to_all_colours(files: List[Path], colour_dirs: Dict[str, Path], order: List[str], apply: bool) -> None:
-    """Copy the last (naturally sorted) image into every colour folder.
-    - Assumes round-robin move already happened.
-    - Determines the destination folder for the original final image based on its index and the order.
-    - Skips copy for folders where the file already exists.
-    """
-    if not files or not order or not apply:
+def _clone_selected_to_all_colours(colour_dirs: Dict[str, Path], selected_name: str) -> None:
+    """Copy the selected image into every colour directory if missing."""
+    selected_name = Path(selected_name).name
+    if not selected_name:
         return
-    k = len(order)
-    final_src_name = files[-1].name
-    final_idx = len(files) - 1
-    assigned_colour = order[final_idx % k].strip()
-    src_dir = colour_dirs.get(assigned_colour)
-    if src_dir is None:
+
+    source_path = None
+    for d in colour_dirs.values():
+        candidate = d / selected_name
+        if candidate.exists():
+            source_path = candidate
+            break
+
+    if source_path is None:
         return
-    src_path = src_dir / final_src_name
-    if not src_path.exists():
-        # If the move didn't happen or file missing, bail quietly.
-        return
-    for colour, d in colour_dirs.items():
-        dst = d / final_src_name
+
+    for target_dir in colour_dirs.values():
+        dst = target_dir / selected_name
         if dst.exists():
             continue
         try:
-            shutil.copy2(str(src_path), str(dst))
+            shutil.copy2(str(source_path), str(dst))
         except Exception:
-            # Keep minimal: ignore copy failures silently.
+            # Ignore copy failures to keep behaviour non-fatal for the UI.
             pass

@@ -131,16 +131,20 @@ def sku2asin_rename(root: Path) -> int:
 
 
 
-def process_root(root: str | Path) -> int:
+def process_root(root: str | Path) -> str:
     """Walk all files under *root* (relative to CWD) and rename them."""
-    root_path = Path.cwd() / root
+    root_path = Path(root) if Path(root).is_absolute() else Path.cwd() / root
     if not root_path.is_dir():
         raise NotADirectoryError(f"Not a directory: {root_path}")
 
-    # Create timestamped Renamed folder
+    # Create timestamped output folder with _Renamed suffix
     import os
     from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d")
+    # Extract timestamp from input root if it's already in Outputs/timestamp format
+    if root_path.parent.name == "Outputs":
+        timestamp = root_path.name
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     script_dir = Path(os.path.dirname(__file__))
     output_root = script_dir / "Outputs" / f"{timestamp}_Renamed"
     output_root.mkdir(parents=True, exist_ok=True)
@@ -153,7 +157,7 @@ def process_root(root: str | Path) -> int:
         sku2asin = _load_sku2asin_csv(ASIN_RE)
     except Exception as e:
         print(f"⚠️  {e}")
-        return 0
+        return ""
 
     for file_path in root_path.rglob("*"):
         if not should_rename(file_path):
@@ -173,6 +177,10 @@ def process_root(root: str | Path) -> int:
             if pt_match:
                 variant = pt_match.group(1).upper()
                 ext = pt_match.group(2)
+            # Try to match MAIN.ext pattern
+            elif re.match(r"^MAIN\.(.+)$", file_path.name, re.IGNORECASE):
+                variant = "MAIN"
+                ext = file_path.suffix.lstrip(".")
             else:
                 print(f"⚠️  Could not parse variant for: {file_path.name}")
                 continue
