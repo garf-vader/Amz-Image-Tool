@@ -106,27 +106,11 @@ def _plan_pairs_for_leaf(root: str, leaf: str, mapping: List[int]) -> List[Tuple
         raise RuntimeError(f"Duplicate target names in '{rel}'. Check mapping.")
     return pairs
 
-def _two_phase_rename(pairs: List[Tuple[str, str]], apply: bool, log: bool):
+def _two_phase_rename(pairs: List[Tuple[str, str]], input_root: str, output_root: str, apply: bool, log: bool):
     """Copy renamed files to Outputs/timestamp instead of renaming in place."""
     if not pairs:
         return
 
-    script_dir = os.path.dirname(__file__)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    # Get the root argument from the caller (run_with_map)
-    frame = inspect.currentframe()
-    while frame:
-        if 'root' in frame.f_locals:
-            input_root = frame.f_locals['root']
-            break
-        frame = frame.f_back
-    else:
-        input_root = None
-    if input_root is None:
-        raise RuntimeError("Could not determine input root for output structure.")
-    input_root = os.path.abspath(str(input_root))
-    output_root = os.path.join(script_dir, "Outputs", timestamp)
-    os.makedirs(output_root, exist_ok=True)
     for src, final_dst in pairs:
         # Preserve full input structure under Outputs/timestamp
         rel_path = os.path.relpath(src, input_root)
@@ -194,8 +178,9 @@ def run_with_map(
     script_dir = os.path.dirname(__file__)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_root = os.path.join(script_dir, "Outputs", timestamp)
+    os.makedirs(output_root, exist_ok=True)
     acted = 0
     for leaf, pairs in results:
-        _two_phase_rename(pairs, apply=bool(apply_changes), log=dry_run_log)
+        _two_phase_rename(pairs, root_str, output_root, apply=bool(apply_changes), log=dry_run_log)
         acted += 1
     return output_root
