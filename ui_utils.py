@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import hashlib
 from typing import Iterable, List, Optional
 
@@ -29,6 +30,20 @@ TARGET_FOLDER_NAMES = ["VintageWallet", "ShinyWallet", "VintWallet", "ShinyCase"
 # Reorder UI visual constants (exposed so UIs don't redefine them)
 INSERT_LINE_PAD: int = 3       # gap before/after row for the insertion line
 INSERT_LINE_HEIGHT: int = 4    # thickness of the insertion line
+
+
+# --------- directory helpers ---------
+def get_executable_dir() -> str:
+    """
+    Get the directory of the executable or script.
+    Works correctly in both development (python) and PyInstaller bundled (exe) modes.
+    """
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle - use executable location
+        return os.path.dirname(sys.executable)
+    else:
+        # Running in normal Python - use script location
+        return os.path.dirname(os.path.abspath(__file__))
 
 
 # --------- generic helpers ---------
