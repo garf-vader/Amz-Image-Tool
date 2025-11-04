@@ -154,16 +154,15 @@ class CombinedApp(QMainWindow):
             self.front_image_label.setStyleSheet("color: red;")
 
     def _fetch_sku2asin(self) -> None:
-        result = subprocess.run([sys.executable, "fetch_sku2asin.py"], capture_output=True, text=True)
-        if result.returncode == 0:
+        try:
+            # Import and call the function directly instead of subprocess
+            from fetch_sku2asin import fetch_sku2asin
+            message = fetch_sku2asin()
             self.fetch_completed = True
-            message = result.stdout.strip() or "Done."
             QMessageBox.information(self, "sku2asin fetch", message)
-        else:
+        except Exception as e:
             self.fetch_completed = False
-            stderr = result.stderr.strip()
-            message = stderr or "fetch_sku2asin failed."
-            QMessageBox.critical(self, "sku2asin fetch", message)
+            QMessageBox.critical(self, "sku2asin fetch", f"Failed to fetch sku2asin:\n{str(e)}")
         self._update_start_enabled()
 
     def _update_start_enabled(self) -> None:
