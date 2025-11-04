@@ -40,6 +40,7 @@ class ColorPhase(QWidget):
 
         self.col_map: dict[str, list[str]] = {}
         self.clone_map: dict[str, str] = {}
+        self.duplicate_indices: dict[str, list[int]] = {}
 
         self.top_dir = root_dir
         self.dir_path = ""
@@ -314,16 +315,6 @@ class ColorPhase(QWidget):
             self.col_map[rel] = seq
         elif rel in self.col_map:
             self.col_map.pop(rel, None)
-        
-        # Store which images are marked for duplication to all colors
-        dup_indices = []
-        for idx, var in enumerate(self.duplicate_all_vars):
-            if var.get():
-                dup_indices.append(idx)
-        if dup_indices:
-            self.duplicate_indices[rel] = dup_indices
-        elif rel in self.duplicate_indices:
-            self.duplicate_indices.pop(rel, None)
 
     def next_model(self) -> None:
         if not self.items:
