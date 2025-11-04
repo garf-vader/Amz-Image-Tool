@@ -151,7 +151,7 @@ def run_with_map(
     *,
     dry_run_log: bool = True,
     allow_parallel: bool = True,
-) -> int:
+) -> str:
     """
     Returns: output folder path.
     """
