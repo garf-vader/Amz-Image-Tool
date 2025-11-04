@@ -82,13 +82,15 @@ def _process(
     col_map: Dict[str, List[str]],
     apply: bool,
     clone_map: Optional[Dict[str, str]] = None,
+    output_root: Optional[Path] = None,
 ) -> int:
-    # Create timestamped output folder
-    import os
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    script_dir = Path(os.path.dirname(__file__))
-    output_root = script_dir / "Outputs" / timestamp
-    output_root.mkdir(parents=True, exist_ok=True)
+    # Use provided output folder or create timestamped one
+    if output_root is None:
+        import os
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        script_dir = Path(os.path.dirname(__file__))
+        output_root = script_dir / "Outputs" / timestamp
+        output_root.mkdir(parents=True, exist_ok=True)
     acted = 0
     clone_map = clone_map or {}
 
@@ -158,13 +160,14 @@ def run_with_map(
             key = Path(str(rel)).as_posix().strip("/")
             if key and name:
                 clone_norm[key] = Path(str(name)).name
-    # Get output folder path
+    # Create output folder path ONCE at the beginning
     from datetime import datetime
     import os
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     script_dir = Path(os.path.dirname(__file__))
     output_root = script_dir / "Outputs" / timestamp
-    acted = _process(root_path, norm, bool(apply_changes), clone_norm)
+    output_root.mkdir(parents=True, exist_ok=True)
+    acted = _process(root_path, norm, bool(apply_changes), clone_norm, output_root)
     return str(output_root)
 
 def _clone_selected_to_all_colours(colour_dirs: Dict[str, Path], selected_name: str) -> None:
