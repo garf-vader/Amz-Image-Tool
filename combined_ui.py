@@ -50,6 +50,7 @@ class CombinedApp(QMainWindow):
         self.front_image_folder: str | None = None
         self.fetch_completed: bool = False
         self._pending_pt_output: str | None = None
+        self._copy_front_images: bool = False
 
         self._start_menu()
 
@@ -62,7 +63,7 @@ class CombinedApp(QMainWindow):
     def _start_menu(self) -> None:
         menu = QWidget()
         layout = QVBoxLayout(menu)
-        layout.setAlignment(Qt.AlignTop)
+        layout.setAlignment(Qt.AlignTop)  # type: ignore
         layout.setSpacing(12)
         layout.setContentsMargins(40, 40, 40, 40)
 
@@ -172,6 +173,7 @@ class CombinedApp(QMainWindow):
         if not self.input_folder:
             QMessageBox.warning(self, "Input required", "Please choose an input folder before starting.")
             return
+        self._copy_front_images = self.front_images_chk.isChecked()
         self.resize(960, 800)
         if self.colours_sorted_chk.isChecked():
             self._show_phase(OrderPhase, self._on_order_done)
@@ -197,7 +199,7 @@ class CombinedApp(QMainWindow):
     def _show_processing_screen(self) -> None:
         processing = QWidget()
         layout = QVBoxLayout(processing)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setAlignment(Qt.AlignCenter)  # type: ignore
         label = QLabel("Sorting complete, processing")
         font = QFont()
         font.setPointSize(14)
@@ -207,10 +209,10 @@ class CombinedApp(QMainWindow):
         self._set_central(processing)
 
     def _finish_processing(self) -> None:
-        if self.front_images_chk.isChecked() and self.front_image_folder and self.input_folder:
-            run_front_images(self.input_folder, self.front_image_folder, self)
         pt_output = self._pending_pt_output
         if pt_output:
+            if self._copy_front_images and self.front_image_folder:
+                run_front_images(pt_output, self.front_image_folder, self)
             try:
                 import amz_rename
 
