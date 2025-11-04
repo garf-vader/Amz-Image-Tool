@@ -167,7 +167,7 @@ def run_with_map(
     script_dir = Path(os.path.dirname(__file__))
     output_root = script_dir / "Outputs" / timestamp
     output_root.mkdir(parents=True, exist_ok=True)
-    acted = _process(root_path, norm, bool(apply_changes), clone_norm, output_root)
+    _process(root_path, norm, bool(apply_changes), clone_norm, output_root)
     return str(output_root)
 
 def _clone_selected_to_all_colours(colour_dirs: Dict[str, Path], selected_name: str) -> None:

@@ -5,9 +5,7 @@ This prevents the bug where each color folder gets its own timestamp.
 
 import os
 import shutil
-import tempfile
 from pathlib import Path
-from datetime import datetime
 import time
 import pytest
 
@@ -57,7 +55,7 @@ def test_pt_order_single_timestamp(tmp_path):
                     shutil.copy2(src, color_dir / f"test-{i:02d}.jpg")
         
         # Run pt_order
-        output_root = pt_order.run_with_map(str(input_dir), pt_map, apply_changes=True)
+        pt_order.run_with_map(str(input_dir), pt_map, apply_changes=True)
         
         # Verify output structure
         outputs_dir = test_root / "Outputs"
@@ -118,7 +116,7 @@ def test_colour_sorter_single_timestamp(tmp_path):
         }
         
         # Run colour_sorter
-        output_root = colour_sorter.run_with_map(
+        colour_sorter.run_with_map(
             str(input_dir.parent.parent.parent),
             col_map,
             apply_changes=True
@@ -182,7 +180,7 @@ def test_amz_rename_uses_input_timestamp(tmp_path):
         amz_rename.__file__ = str(tmp_path / "amz_rename.py")
         
         # Run amz_rename
-        output_root = amz_rename.run(str(input_dir.parent.parent.parent.parent))
+        amz_rename.run(str(input_dir.parent.parent.parent.parent))
         
         # Verify the output folder uses the SAME timestamp with _Renamed suffix
         outputs_dir = tmp_path / "Outputs"
@@ -241,6 +239,9 @@ def test_no_duplicate_timestamps_in_workflow(tmp_path):
             "Apple/iPhone 17/VintageWallet": [0, 1, 2, 3, 4]
         }
         pt_output = pt_order.run_with_map(colour_output, pt_map, apply_changes=True)
+        # Use pt_output: check that it exists and is a directory
+        assert Path(pt_output).exists() and Path(pt_output).is_dir(), \
+            f"pt_output directory does not exist: {pt_output}"
         
         # Verify: Should have exactly 2 timestamped folders (one from each step)
         outputs_dir = test_root / "Outputs"
