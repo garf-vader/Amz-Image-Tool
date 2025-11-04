@@ -110,6 +110,19 @@ def _process(
         if not files:
             continue
 
+        # Get list of indices to duplicate to all colors
+        dup_indices = set(duplicate_indices.get(rel_posix, []))
+        
+        # Separate normal files from duplicate-to-all files
+        # Important: We skip duplicate-to-all images in the color sequence
+        normal_files = []
+        duplicate_all_files = []
+        for i, f in enumerate(files):
+            if i in dup_indices:
+                duplicate_all_files.append(f)
+            else:
+                normal_files.append(f)
+
         # Create output dirs for colours
         out_dirs = {}
         for c in colours:
@@ -120,9 +133,11 @@ def _process(
             d.mkdir(parents=True, exist_ok=True)
             out_dirs[name] = d
 
-        # Copy files round-robin to output dirs
+        # Copy normal files round-robin to output dirs
+        # These files get their color assignment based on their position in the FILTERED list
+        # (skipping the duplicate-to-all images)
         k = len(colours)
-        for i, src in enumerate(files):
+        for i, src in enumerate(normal_files):
             colour = colours[i % k].strip()
             if not colour:
                 continue

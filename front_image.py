@@ -1,15 +1,18 @@
 import os
 import shutil
-from typing import Optional
-from pathlib import Path
 from pathlib import Path
 from typing import Optional, List
 import re
 from logic_utils import natural_key
 
+
+# Accept common image extensions for front images
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+
+
 def copy_front_images(front_images_dir: str, root_dir: str) -> dict:
     """
-    For each model/producttype/colour.jpg in front_images_dir,
+    For each model/producttype/colour.<ext> in front_images_dir,
     copy it into model/producttype/colour/MAIN.jpg in root_dir.
     Returns a dict with counts: {'copied': int, 'skipped': int}
     """
