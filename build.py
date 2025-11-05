@@ -40,7 +40,7 @@ def build_executable():
         '--name=ImageTool',
         '--onefile',  # Create a single executable
         '--windowed',  # No console window (GUI app)
-        '--icon=NONE',  # Add an icon file if you have one
+        '--icon=ImageTool.ico' if os.path.exists('ImageTool.ico') else '--icon=NONE',
         
         # Hidden imports for modules loaded dynamically
         '--hidden-import=colour_sorter',
@@ -67,6 +67,7 @@ def build_executable():
         
         # Add data files
         '--add-data=sku2asin.csv;.' if os.path.exists('sku2asin.csv') else '',
+        '--add-data=.env;.' if os.path.exists('.env') else '',
         
         # Clean build
         '--clean',
