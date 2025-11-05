@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 from dotenv import load_dotenv
 
@@ -17,7 +18,15 @@ def fetch_sku2asin(output_file: str = "sku2asin.csv") -> str:
         Exception: If fetch fails or credentials are missing
     """
     # === STEP 1: Your credentials ===
-    load_dotenv()
+    # Find .env in the correct location (works for both script and PyInstaller)
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle - .env is in temporary directory
+        env_path = os.path.join(sys._MEIPASS, '.env')  # type: ignore
+    else:
+        # Running as script - .env is in same directory
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+    
+    load_dotenv(env_path)
     DATASET_ID = os.getenv("DATASET_ID")
     API_ID = os.getenv("API_ID")
     API_KEY = os.getenv("API_KEY")
