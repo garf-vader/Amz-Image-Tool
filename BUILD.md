@@ -43,7 +43,7 @@ If you want to customize the build:
 ```powershell
 pyinstaller --name=ImageTool --onefile --windowed ^
   --hidden-import=colour_sorter --hidden-import=color_phase ^
-  --hidden-import=order_phase --hidden-import=front_image ^
+  --hidden-import=order_phase ^
   --hidden-import=amz_rename --hidden-import=pt_order ^
   --hidden-import=ui_utils --hidden-import=logic_utils ^
   combined_ui.py

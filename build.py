@@ -46,7 +46,6 @@ def build_executable():
         '--hidden-import=colour_sorter',
         '--hidden-import=color_phase',
         '--hidden-import=order_phase',
-        '--hidden-import=front_image',
         '--hidden-import=amz_rename',
         '--hidden-import=pt_order',
         '--hidden-import=fetch_sku2asin',
@@ -93,7 +92,7 @@ def build_executable():
     print(f"\nCommand: {' '.join(cmd)}\n")
     
     try:
-        result = subprocess.run(cmd, check=True, capture_output=False)
+        subprocess.run(cmd, check=True)
         print("\n" + "="*60)
         print("✓ Build completed successfully!")
         print("="*60)
