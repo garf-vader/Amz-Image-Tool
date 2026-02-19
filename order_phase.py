@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Optional
+from typing import List
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
@@ -90,6 +90,7 @@ class OrderPhase(QWidget):
         self.root_dir = root_dir
 
         self.pt_map: dict[str, list[int]] = {}
+        self.grouped_leafs: dict[str, list[str]] = {}
 
         self.dir_path = ""
         self.items: list[ThumbItem] = []
@@ -147,25 +148,27 @@ class OrderPhase(QWidget):
         self._update_progress_label()
 
     def _find_case_leafs(self, root: str) -> List[str]:
-        found: List[str] = []
+        grouped: dict[str, list[str]] = {}
         for dirpath, _dirnames, _filenames in os.walk(root):
             if os.path.basename(dirpath) in TARGET_FOLDER_NAMES:
-                leaf = self._first_leaf_dir(dirpath)
-                if leaf and self._has_images(leaf):
-                    found.append(os.path.normpath(leaf))
-        seen = set()
-        uniq = [p for p in found if not (p in seen or seen.add(p))]
-        uniq.sort(key=natural_key)
-        return uniq
+                leafs = self._leaf_dirs_with_images(dirpath)
+                if leafs:
+                    grouped[os.path.normpath(dirpath)] = leafs
 
-    def _first_leaf_dir(self, start: str) -> Optional[str]:
-        cur = start
-        while True:
-            subs = [d for d in os.listdir(cur) if os.path.isdir(os.path.join(cur, d))]
-            subs.sort(key=natural_key)
-            if not subs:
-                return cur
-            cur = os.path.join(cur, subs[0])
+        self.grouped_leafs = grouped
+        reps = [leafs[0] for _base, leafs in sorted(grouped.items(), key=lambda kv: natural_key(kv[0]))]
+        reps.sort(key=natural_key)
+        return reps
+
+    def _leaf_dirs_with_images(self, start: str) -> List[str]:
+        leaves: list[str] = []
+        for dirpath, dirnames, _ in os.walk(start):
+            if dirnames:
+                continue
+            if self._has_images(dirpath):
+                leaves.append(os.path.normpath(dirpath))
+        leaves.sort(key=natural_key)
+        return leaves
 
     def _has_images(self, path: str) -> bool:
         try:
@@ -182,7 +185,7 @@ class OrderPhase(QWidget):
         )
         self.items = [ThumbItem(os.path.join(path, f), i) for i, f in enumerate(files)]
         self._render_list()
-        self.status.setText(f"Loaded {len(self.items)} images")
+        self.status.setText(f"Loaded {len(self.items)} images from one colour; order will be applied to all colours.")
 
     def _render_list(self) -> None:
         self.list_widget.clear()
@@ -210,7 +213,12 @@ class OrderPhase(QWidget):
 
     def _update_progress_label(self) -> None:
         if self.vw_queue and 0 <= self.vw_idx < len(self.vw_queue):
-            self.lbl_dir.setText(f"[{self.vw_idx + 1}/{len(self.vw_queue)}] {self.dir_path}")
+            rel_leaf = os.path.relpath(self.dir_path, self.root_dir).replace("\\", "/").strip("/")
+            base_rel = os.path.dirname(rel_leaf)
+            colour_count = len(self.grouped_leafs.get(os.path.normpath(os.path.join(self.root_dir, base_rel)), []))
+            self.lbl_dir.setText(
+                f"[{self.vw_idx + 1}/{len(self.vw_queue)}] {self.dir_path} (applies to {max(1, colour_count)} colours)"
+            )
         else:
             self.lbl_dir.setText(self.dir_path or "No folder selected")
 
