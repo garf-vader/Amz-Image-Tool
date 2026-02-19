@@ -1,72 +1,51 @@
 import os
 import sys
+from pathlib import Path
+
 import requests
 from dotenv import load_dotenv
 
 
+def _env_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS")) / ".env"
+    return Path(__file__).with_name(".env")
+
+
 def fetch_sku2asin(output_file: str = "sku2asin.csv") -> str:
-    """
-    Fetch SKU to ASIN mapping from Domo API and save as CSV.
-    
-    Args:
-        output_file: Path to save the CSV file
-        
-    Returns:
-        Success message
-        
-    Raises:
-        Exception: If fetch fails or credentials are missing
-    """
-    # === STEP 1: Your credentials ===
-    # Find .env in the correct location (works for both script and PyInstaller)
-    if getattr(sys, 'frozen', False):
-        # Running in PyInstaller bundle - .env is in temporary directory
-        env_path = os.path.join(sys._MEIPASS, '.env')  # type: ignore
-    else:
-        # Running as script - .env is in same directory
-        env_path = os.path.join(os.path.dirname(__file__), '.env')
-    
-    load_dotenv(env_path)
-    DATASET_ID = os.getenv("DATASET_ID")
-    API_ID = os.getenv("API_ID")
-    API_KEY = os.getenv("API_KEY")
-    
-    if not all([DATASET_ID, API_ID, API_KEY]):
-        raise Exception("Missing credentials in .env file (DATASET_ID, API_ID, API_KEY)")
+    load_dotenv(_env_path())
 
-    # === STEP 2: Get OAuth token ===
-    auth_url = "https://api.domo.com/oauth/token"
-    data = {
-        "grant_type": "client_credentials",
-        "scope": "data"
-    }
-    auth_response = requests.post(auth_url, data=data, auth=(API_ID, API_KEY))
-    
-    if auth_response.status_code != 200:
-        raise Exception(f"Authentication failed: {auth_response.status_code}")
-    
-    access_token = auth_response.json()["access_token"]
+    dataset_id = os.getenv("DATASET_ID")
+    api_id = os.getenv("API_ID")
+    api_key = os.getenv("API_KEY")
+    if not all((dataset_id, api_id, api_key)):
+        raise RuntimeError("Missing credentials in .env file (DATASET_ID, API_ID, API_KEY)")
 
-    # === STEP 3: Fetch dataset ===
-    headers = {"Authorization": f"bearer {access_token}"}
-    data_url = f"https://api.domo.com/v1/datasets/{DATASET_ID}/data?includeHeader=true"
-    response = requests.get(data_url, headers=headers)
+    auth = requests.post(
+        "https://api.domo.com/oauth/token",
+        data={"grant_type": "client_credentials", "scope": "data"},
+        auth=(api_id, api_key),
+        timeout=30,
+    )
+    auth.raise_for_status()
+    token = auth.json().get("access_token")
+    if not token:
+        raise RuntimeError("No access_token in auth response")
 
-    if response.status_code != 200:
-        raise Exception(f"Failed to fetch dataset: {response.status_code} - {response.text}")
+    data = requests.get(
+        f"https://api.domo.com/v1/datasets/{dataset_id}/data?includeHeader=true",
+        headers={"Authorization": f"bearer {token}"},
+        timeout=60,
+    )
+    data.raise_for_status()
 
-    # === Step 4: Save as CSV file ===
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(response.text)
-
+    Path(output_file).write_text(data.text, encoding="utf-8")
     return f"Dataset saved as: {output_file}"
 
 
 if __name__ == "__main__":
-    # When run as a script, execute the function
     try:
-        message = fetch_sku2asin()
-        print(message)
-    except Exception as e:
-        print(f"Error: {e}")
-        exit(1)
+        print(fetch_sku2asin())
+    except Exception as exc:
+        print(f"Error: {exc}")
+        raise SystemExit(1)

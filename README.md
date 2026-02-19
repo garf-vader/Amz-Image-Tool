@@ -3,9 +3,6 @@ Tool to categorise and create zip file for amz images
 
 ## Main Scripts
 
-- **main_tester.py**  
-	Debug helper to copy images (model/producttype/colour.jpg) into model/producttype/colour/MAIN.jpg.
-
 - **combined_ui.py**  
 	Combined workflow UI for colour and order phases.  
 	- Colour Phase: Assign colour sequences to images.
