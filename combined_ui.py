@@ -25,19 +25,6 @@ from color_phase import ColorPhase
 from order_phase import OrderPhase
 
 
-def run_front_images(root_dir: str, front_image_folder: str, parent: QWidget | None = None) -> None:
-    if not front_image_folder:
-        return
-    from front_image import copy_front_images
-
-    result = copy_front_images(front_image_folder, root_dir)
-    QMessageBox.information(
-        parent,
-        "Front Images",
-        f"Copied: {result['copied']}, Skipped: {result['skipped']}",
-    )
-
-
 class CombinedApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -47,10 +34,8 @@ class CombinedApp(QMainWindow):
 
         self.phase_widget: QWidget | None = None
         self.input_folder: str | None = None
-        self.front_image_folder: str | None = None
         self.fetch_completed: bool = False
         self._pending_pt_output: str | None = None
-        self._copy_front_images: bool = False
 
         self._start_menu()
 
@@ -76,21 +61,6 @@ class CombinedApp(QMainWindow):
 
         self.colours_sorted_chk = QCheckBox("Colours are already sorted")
         layout.addWidget(self.colours_sorted_chk)
-
-        self.front_images_chk = QCheckBox("Copy front images into folders")
-        layout.addWidget(self.front_images_chk)
-
-        front_row = QHBoxLayout()
-        self.front_image_label = QLabel("No front image folder selected")
-        self.front_image_label.setStyleSheet("color: red;")
-        front_row.addWidget(self.front_image_label, stretch=1)
-        self.btn_front_folder = QPushButton("Select Front Image Folder")
-        self.btn_front_folder.setEnabled(False)
-        self.btn_front_folder.clicked.connect(self._pick_front_image_folder)
-        front_row.addWidget(self.btn_front_folder)
-        layout.addLayout(front_row)
-
-        self.front_images_chk.toggled.connect(self._toggle_front_folder)
 
         input_row = QHBoxLayout()
         self.input_label = QLabel("No input folder selected")
@@ -122,13 +92,6 @@ class CombinedApp(QMainWindow):
         self._set_central(menu)
 
     # ------------------------------------------------------------------
-    def _toggle_front_folder(self, checked: bool) -> None:
-        self.btn_front_folder.setEnabled(checked)
-        if not checked:
-            self.front_image_folder = None
-            self.front_image_label.setText("No front image folder selected")
-            self.front_image_label.setStyleSheet("color: red;")
-
     def _pick_input_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Choose TOP-LEVEL input folder")
         if folder:
@@ -141,17 +104,6 @@ class CombinedApp(QMainWindow):
             self.input_label.setText("No input folder selected")
             self.input_label.setStyleSheet("color: red;")
             self._update_start_enabled()
-
-    def _pick_front_image_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Choose FRONT IMAGES folder")
-        if folder:
-            self.front_image_folder = folder
-            self.front_image_label.setText(f"Front Images: {os.path.basename(folder)}")
-            self.front_image_label.setStyleSheet("color: green;")
-        else:
-            self.front_image_folder = None
-            self.front_image_label.setText("No front image folder selected")
-            self.front_image_label.setStyleSheet("color: red;")
 
     def _fetch_sku2asin(self) -> None:
         result = subprocess.run([sys.executable, "fetch_sku2asin.py"], capture_output=True, text=True)
@@ -173,7 +125,6 @@ class CombinedApp(QMainWindow):
         if not self.input_folder:
             QMessageBox.warning(self, "Input required", "Please choose an input folder before starting.")
             return
-        self._copy_front_images = self.front_images_chk.isChecked()
         self.resize(960, 800)
         if self.colours_sorted_chk.isChecked():
             self._show_phase(OrderPhase, self._on_order_done)
@@ -211,8 +162,6 @@ class CombinedApp(QMainWindow):
     def _finish_processing(self) -> None:
         pt_output = self._pending_pt_output
         if pt_output:
-            if self._copy_front_images and self.front_image_folder:
-                run_front_images(pt_output, self.front_image_folder, self)
             try:
                 import amz_rename
 
