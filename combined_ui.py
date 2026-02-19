@@ -2,7 +2,6 @@
 """Combined PyQt workflow for the colour and order phases."""
 
 import os
-import subprocess
 import sys
 
 from PyQt5.QtCore import Qt, QTimer
@@ -106,16 +105,16 @@ class CombinedApp(QMainWindow):
             self._update_start_enabled()
 
     def _fetch_sku2asin(self) -> None:
-        result = subprocess.run([sys.executable, "fetch_sku2asin.py"], capture_output=True, text=True)
-        if result.returncode == 0:
+        try:
+            from fetch_sku2asin import fetch_sku2asin_csv
+
+            output_file = fetch_sku2asin_csv()
             self.fetch_completed = True
-            message = result.stdout.strip() or "Done."
+            message = f"Dataset saved as: {output_file}"
             QMessageBox.information(self, "sku2asin fetch", message)
-        else:
+        except Exception as exc:
             self.fetch_completed = False
-            stderr = result.stderr.strip()
-            message = stderr or "fetch_sku2asin failed."
-            QMessageBox.critical(self, "sku2asin fetch", message)
+            QMessageBox.critical(self, "sku2asin fetch", str(exc) or "fetch_sku2asin failed.")
         self._update_start_enabled()
 
     def _update_start_enabled(self) -> None:
